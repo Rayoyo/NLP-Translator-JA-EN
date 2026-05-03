@@ -1,0 +1,29 @@
+# Python byte-code
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# SentencePiece training artefacts kept locally
+data/*.model
+data/*.vocab
+
+# Model checkpoints (large binary files)
+checkpoints/*.pt
+checkpoints/*.pth
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
