@@ -3,8 +3,10 @@ My own very first translator, by using python and working on a jupiter notebook
 
 Here I will add some info about how to see the project and start it on your computer
 
+---
+##Project layout
 
-Actual file structure:
+'''
 ├── data/               # I tuoi file .txt (originali e processati)
 ├── checkpoints/        # Per salvare i pesi del modello durante il training
 ├── src/                # Script Python (.py)
@@ -15,3 +17,4 @@ Actual file structure:
 ├── notebooks/          # Jupyter Notebooks per test rapidi e visualizzazioni
 ├── app.py              # La GUI (Streamlit o Gradio)
 └── requirements.txt    # Librerie necessarie
+'''
