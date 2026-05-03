@@ -4,7 +4,7 @@ My own very first translator, by using python and working on a jupiter notebook
 Here I will add some info about how to see the project and start it on your computer
 
 ---
-##Project layout
+## Project layout
 
 ```
 ├── data/               # I tuoi file .txt (originali e processati)
