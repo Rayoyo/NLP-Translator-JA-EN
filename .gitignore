@@ -1,3 +1,15 @@
-/data
-/data
-/data
+# Data
+data/raw/*.txt
+data/processed/*.txt
+models/*.pt
+models/*.pth
+*.bin
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Temp
+temp_*.txt
+*.log
