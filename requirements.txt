@@ -1,0 +1,8 @@
+torch>=2.0.0
+sentencepiece
+sacrebleu
+transformers
+gradio
+tqdm
+numpy
+datasets  # HuggingFace datasets per memory mapping
