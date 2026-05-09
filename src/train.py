@@ -201,8 +201,8 @@ class Trainer:
             else:
                 print()
             
-            # Auto-save every 2 epochs (for work on Colab)
-            if epoch % 2 == 0:
+            # Auto-save every epoch (for work on Colab)
+            if True:
                 self.save_checkpoint(f"backup_epoch_{epoch}.pt")
 
 
