@@ -14,15 +14,16 @@ class LazyTranslationDataset(Dataset):
     It builds and offset index (byte position) for every row, 
     then it reads only the current batch from the disk
     """
+     
     def __init__(self, path_en, path_jp, sp_en, sp_jp, max_samples=None):
         self.sp_en = sp_en
         self.sp_jp = sp_jp
         self.path_en = path_en
         self.path_jp = path_jp
         
-        # Build offset index (only numbers)
+        # Build offset index in BINARY mode for accurate byte offsets
         self.offsets = []
-        with open(path_en, 'r', encoding='utf-8') as f:
+        with open(path_en, 'rb') as f:
             while True:
                 pos = f.tell()
                 line = f.readline()
@@ -32,7 +33,6 @@ class LazyTranslationDataset(Dataset):
                 if max_samples and len(self.offsets) >= max_samples:
                     break
         
-        # Keep files open for fast seeking (one per worker issue handled in __getitem__)
         self.len = len(self.offsets)
         print(f"LazyDataset: indexed {self.len:,} lines (RAM usage: ~{self.len * 8 / 1024 / 1024:.1f} MB)")
         
@@ -40,19 +40,21 @@ class LazyTranslationDataset(Dataset):
         return self.len
     
     def __getitem__(self, idx):
-        with open(self.path_en, 'r', encoding='utf-8', errors='replace') as f_en, \
-         open(self.path_jp, 'r', encoding='utf-8', errors='replace') as f_jp:
+        # Open in BINARY, seek to exact byte, then decode with error handling
+        with open(self.path_en, 'rb') as f_en, \
+             open(self.path_jp, 'rb') as f_jp:
+            
+            f_en.seek(self.offsets[idx])
+            f_jp.seek(self.offsets[idx])
+            
+            # Read raw bytes and decode safely
+            en_text = f_en.readline().decode('utf-8', errors='replace').strip()
+            jp_text = f_jp.readline().decode('utf-8', errors='replace').strip()
         
-        f_en.seek(self.offsets[idx])
-        f_jp.seek(self.offsets[idx])
-        
-        # Normalizza anche i caratteri giapponesi
-        en_text = unicodedata.normalize('NFKC', f_en.readline().strip())
-        jp_text = unicodedata.normalize('NFKC', f_jp.readline().strip())
-    
+        # Tokenize
         en_ids = self.sp_en.encode(en_text, out_type=int, add_bos=True, add_eos=True)
         jp_ids = self.sp_jp.encode(jp_text, out_type=int, add_bos=True, add_eos=True)
-    
+        
         return torch.tensor(en_ids, dtype=torch.long), torch.tensor(jp_ids, dtype=torch.long)
 
 
