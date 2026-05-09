@@ -11,7 +11,6 @@ import os
 
 class LazyTranslationDataset(Dataset):
     """
-    Dataset che NON carica il file in RAM.
     It builds and offset index (byte position) for every row, 
     then it reads only the current batch from the disk
     """
@@ -42,20 +41,20 @@ class LazyTranslationDataset(Dataset):
     
     def __getitem__(self, idx):
         # Open files fresh (thread-safe for DataLoader num_workers > 0)
-        with open(self.path_en, 'r', encoding='utf-8') as f_en, \
-             open(self.path_jp, 'r', encoding='utf-8') as f_jp:
-            
-            f_en.seek(self.offsets[idx])
-            f_jp.seek(self.offsets[idx])
-            
-            en_text = f_en.readline().strip()
-            jp_text = f_jp.readline().strip()
+    with open(self.path_en, 'r', encoding='utf-8', errors='replace') as f_en, \
+         open(self.path_jp, 'r', encoding='utf-8', errors='replace') as f_jp:
         
-        # Tokenize
-        en_ids = self.sp_en.encode(en_text, out_type=int, add_bos=True, add_eos=True)
-        jp_ids = self.sp_jp.encode(jp_text, out_type=int, add_bos=True, add_eos=True)
+        f_en.seek(self.offsets[idx])
+        f_jp.seek(self.offsets[idx])
         
-        return torch.tensor(en_ids, dtype=torch.long), torch.tensor(jp_ids, dtype=torch.long)
+        en_text = f_en.readline().strip()
+        jp_text = f_jp.readline().strip()
+    
+    # Tokenize
+    en_ids = self.sp_en.encode(en_text, out_type=int, add_bos=True, add_eos=True)
+    jp_ids = self.sp_jp.encode(jp_text, out_type=int, add_bos=True, add_eos=True)
+    
+    return torch.tensor(en_ids, dtype=torch.long), torch.tensor(jp_ids, dtype=torch.long)
 
 
 def collate_fn(batch, pad_idx=0):
@@ -80,10 +79,9 @@ def collate_fn(batch, pad_idx=0):
     return src_padded, tgt_padded
 
 
-def create_dataloaders(path_en, path_jp, sp_en, sp_jp, batch_size=32, 
-                       num_workers=2, max_samples=None):
+def create_dataloaders(path_en, path_jp, sp_en, sp_jp, batch_size=32, num_workers=2, max_samples=None):
     """
-    Crea DataLoader with lazy loading
+    Create DataLoader with lazy loading
     """
     dataset = LazyTranslationDataset(path_en, path_jp, sp_en, sp_jp, max_samples)
     
