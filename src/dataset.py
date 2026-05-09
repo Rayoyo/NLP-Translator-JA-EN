@@ -40,21 +40,20 @@ class LazyTranslationDataset(Dataset):
         return self.len
     
     def __getitem__(self, idx):
-        # Open files fresh (thread-safe for DataLoader num_workers > 0)
-    with open(self.path_en, 'r', encoding='utf-8', errors='replace') as f_en, \
+        with open(self.path_en, 'r', encoding='utf-8', errors='replace') as f_en, \
          open(self.path_jp, 'r', encoding='utf-8', errors='replace') as f_jp:
         
         f_en.seek(self.offsets[idx])
         f_jp.seek(self.offsets[idx])
         
-        en_text = f_en.readline().strip()
-        jp_text = f_jp.readline().strip()
+        # Normalizza anche i caratteri giapponesi
+        en_text = unicodedata.normalize('NFKC', f_en.readline().strip())
+        jp_text = unicodedata.normalize('NFKC', f_jp.readline().strip())
     
-    # Tokenize
-    en_ids = self.sp_en.encode(en_text, out_type=int, add_bos=True, add_eos=True)
-    jp_ids = self.sp_jp.encode(jp_text, out_type=int, add_bos=True, add_eos=True)
+        en_ids = self.sp_en.encode(en_text, out_type=int, add_bos=True, add_eos=True)
+        jp_ids = self.sp_jp.encode(jp_text, out_type=int, add_bos=True, add_eos=True)
     
-    return torch.tensor(en_ids, dtype=torch.long), torch.tensor(jp_ids, dtype=torch.long)
+        return torch.tensor(en_ids, dtype=torch.long), torch.tensor(jp_ids, dtype=torch.long)
 
 
 def collate_fn(batch, pad_idx=0):
