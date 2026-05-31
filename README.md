@@ -16,7 +16,10 @@ Here I will add some info about how to see the project and start it on your comp
 │       ├── english.txt
 │       └── japanese.txt
 ├── models/                     # Saved weights (NOT on GitHub)
-│   └── .gitkeep
+│   ├── en_tokenizer.model
+│   ├── en_tokenizer.vocab
+│   ├── jp_tokenizer.model
+│   └── jp_tokenizer.vocab
 ├── notebooks/
 │   └── main_training.ipynb     # Notebook Colab principal
 ├── src/
