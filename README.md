@@ -7,35 +7,34 @@ Here I will add some info about how to see the project and start it on your comp
 ## Project layout
 
 ```
-├── data/
-│   ├── raw/                    # Original file 
+├── data/ _____________________
+│   ├── raw/ ------------------ # Original file 
 │   │   ├── CITATION
 │   │   ├── LICENSE
 │   │   └── en-ja.dataset.txt   # Original dataset (NOT on GitHub, only .gitignore)
-│   └── processed/              # Clean file (NOT on GitHub)
-│       ├── english.txt
-│       └── japanese.txt
-├── models/                     # Saved weights (NOT on GitHub)
-│   ├── en_tokenizer.model
-│   ├── en_tokenizer.vocab
-│   ├── jp_tokenizer.model
-│   └── jp_tokenizer.vocab
-├── notebooks/
-│   └── main_training.ipynb     # Notebook Colab principal
-├── src/
-│   ├── __init__.py
-│   ├── transformer.py          # Transformer architecture
-│   ├── dataset.py              # Dataset memory-efficient
-│   ├── tokenizer.py            # Tokenizer menaging
+│   └── processed/ ------------ # Clean file (NOT on GitHub)-----------------------
+│       ├── english.txt         # Only English sentences, one per line
+│       └── japanese.txt ______ # Only Japanese sentences, one per line
+├── models/ ------------------- # Weights and tokenizers (NOT on GitHub) ----------
+│   ├── en_tokenizer.model      # English Vocabulary (Sentence Piece BPE)
+│   ├── en_tokenizer.vocab      # Token List → ID (readable text)
+│   ├── jp_tokenizer.model      # Japanese Vocabulary (SentencePiece Unigram)
+│   └── jp_tokenizer.vocab      # Token list -> ID
+├── notebooks/   -------------- # Jupyter Notebook----------------------------------
+│   └── main_training.ipynb     # Notebook Colab 
+├── src/ ---------------------- # Modular Python code (the "core")------------------
+│   ├── __init__.py             # Makes src an importable Python package
+│   ├── transformer.py          # Transformer architecture (Encoder, Decoder, Attention)
+│   ├── dataset.py              # Dataset memory-efficient (LAZY loading)
 │   ├── train.py                # Training loop
 │   ├── evaluate.py             # BLEU score & comparison
-│   └── gui.py                  # Gradio interface
+│   └── gui.py ________________ # Gradio interface _________________________________
 ├── app.py                      # Entry point for local GUI
 ├── clean_dataset.py            # To clean the dataset and select a part of it (1 500 000 sentences)
-├── local_tokenizer_train.py    # To avoind RAM limit problem of Colab, cound be avoided if you use the ones provided by JParaCrawl
-├── requirements.txt
-├── .gitignore
-└── README.md
+├── local_tokenizer_train.py    # Wrapper for training/loading, cound be avoided if you use the ones provided by JParaCrawl
+├── requirements.txt            # List of required Python libraries
+├── .gitignore                  # Not loaded files
+└── README.md                   # Project documentation
 ```
 ---
 # Some general info
@@ -80,7 +79,7 @@ It is better not to direclty use Google Colab due to the RAM limit (8GB), so the
    - Build a vocabulary: Assign each piece a unique number (ID)
    - Handle Japanese: Unlike English, Japanese doesn't use spaces between words. Without a dedicated tokenizer (like SentencePiece), the AI ​​would only see an infinite string of meaningless symbols \
     Can be done in two ways:
-   1. Create `model` and `vocab` by running the file `local_tokenizer_train.py` in the following way:
+   1. Create `model` and `vocab` by running the file `local_tokenizer_train.py` in the following way: (_it may take about 30 minutes_)
       - as before, enter the folder if you are not in it already, then create and start the virtual env before run the code
         ```
         pip install sentencepiece         # install dependencies to create the tokenizer
