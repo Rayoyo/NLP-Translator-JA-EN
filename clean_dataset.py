@@ -13,16 +13,23 @@ INPUT_FILE = Path("data/raw/en-ja.dataset.txt")   # original file
 OUT_EN = Path("data/processed/english.txt")
 OUT_JP = Path("data/processed/japanese.txt")
 
-# Crea cartella processed se non esiste
+MAX_LINES = 1_500_000  # max lines to process (None = all, ~8GB, requires 16-20GB RAM)
+
+if MAX_LINES is not None:
+    print(f"!!! LIMIT SET: The program will stop at {MAX_LINES} lines !!!")
+else:
+    print("!!! WARNING: No limit set. Processing the entire file !!!")
+
+# Create processed folder if it doesn't exist
 OUT_EN.parent.mkdir(parents=True, exist_ok=True)
 
 def normalize(s):
     if not s:
         return ""
     s = unicodedata.normalize("NFKC", s.strip())
-    # Rimuovi newline interni
+    # removes internal newlines
     s = s.replace("\n", " ").replace("\r", " ")
-    # Rimuovi spazi multipli
+    # Remove extra spaces
     s = re.sub(r'\s+', ' ', s)
     return s.strip()
 
@@ -31,13 +38,20 @@ bad = 0
 
 print(f"Reading: {INPUT_FILE}")
 print(f"Writing: {OUT_EN} and {OUT_JP}")
-print("Processing... (può richiedere diversi minuti con 8GB)")
+if MAX_LINES:
+    print(f"Limit set to: {MAX_LINES:,} valid pairs")
+print("Processing... (may take several minutes with 8GB)")
 
 with open(INPUT_FILE, "r", encoding="utf-8") as fin, \
      open(OUT_EN, "w", encoding="utf-8") as f_en, \
      open(OUT_JP, "w", encoding="utf-8") as f_jp:
 
     for i, line in enumerate(fin):
+        # Stop if we reached the max valid pairs
+        if MAX_LINES and count >= MAX_LINES:
+            print(f"\n[INFO] limit reached: {MAX_LINES:,} valid pairs. Interrupting...")
+            break
+
         if i % 500_000 == 0 and i > 0:
             print(f"  Processed {i:,} lines, valid: {count:,}")
         
@@ -46,7 +60,7 @@ with open(INPUT_FILE, "r", encoding="utf-8") as fin, \
             bad += 1
             continue
         
-        # Estrai colonne 4 e 5 (0-indexed: 3 e 4)
+        # Extract columns 4 and 5 (0-indexed: 3 and 4)
         en = normalize(parts[3])
         jp = normalize(parts[4])
 
