@@ -13,3 +13,7 @@ __pycache__/
 # Temp
 temp_*.txt
 *.log
+models/jp_tokenizer.vocab
+models/en_tokenizer.model
+models/jp_tokenizer.model
+models/en_tokenizer.vocab
