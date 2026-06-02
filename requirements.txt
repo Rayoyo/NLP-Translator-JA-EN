@@ -1,8 +1,8 @@
-torch>=2.0.0
-sentencepiece
-sacrebleu
-transformers
-gradio
-tqdm
-numpy
-datasets  # HuggingFace datasets per memory mapping
+torch>=2.0.0                       # PyTorch: framework deep learning (tensori, autograd, GPU)
+sentencepiece                      # Google Library for Subword Tokenization
+sacrebleu                          # Standard BLEU metric for translation evaluation
+transformers                       # HuggingFace: Pre-trained models (Helsinki-NLP/opus-mt) 
+gradio                             # Framework for creating web apps in just a few lines
+tqdm                               # Visual progress bars
+numpy                              # Numeric operations (PyTorch uses it internally)
+datasets                           # HuggingFace datasets per memory mapping

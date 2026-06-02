@@ -13,15 +13,15 @@ import time
 class Trainer:
     def __init__(
         self,
-        model,
-        train_loader,
-        val_loader=None,
-        optimizer=None,
-        criterion=None,
-        scheduler=None,
+        model,                # transformer instance
+        train_loader,         # DataLoader for training
+        val_loader=None,      # DataLoader for validation (optional)
+        optimizer=None,       # optimizer (default: Adam with transformer-friendly settings)
+        criterion=None,       # loss function (default: CrossEntropyLoss with ignore_index=0 for padding)
+        scheduler=None,       # learning rate scheduler (optional)
         device='cuda',
-        save_dir='models',
-        log_interval=100
+        save_dir='models',    # directory to save checkpoints
+        log_interval=100      # print training stats every N batches
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -30,30 +30,34 @@ class Trainer:
         self.save_dir = save_dir
         self.log_interval = log_interval
         
+        # default optimizer: Adam with transformer-friendly settings
         self.optimizer = optimizer or torch.optim.Adam(
             model.parameters(), 
-            lr=1e-4, 
-            betas=(0.9, 0.98), 
-            eps=1e-9
+            lr=1e-4,             # initial learning rate (will be overridden by scheduler if provided)
+            betas=(0.9, 0.98),   # momentum adam (0.9 for gradient, 0.98 for squared gradient)
+            eps=1e-9             # epsilon for numerical stability
         )
         
+        # default criterion: CrossEntropyLoss with ignore_index=0 for padding
         self.criterion = criterion or nn.CrossEntropyLoss(ignore_index=0)  # pad_idx=0
         
         self.scheduler = scheduler
         
-        self.scaler = GradScaler()  # Mixed precision
-        self.global_step = 0
-        self.epoch = 0
-        self.best_val_loss = float('inf')
+        self.scaler = GradScaler()         # Mixed precision
+        self.global_step = 0               # counts total optimization steps (for scheduler)
+        self.epoch = 0                     # current epoch
+        self.best_val_loss = float('inf')  # best validation loss for checkpointing
         
         os.makedirs(save_dir, exist_ok=True)
         
     def train_epoch(self):
-        self.model.train()
+        self.model.train()  # training mode: enables dropout, batch norm & uses batch stats
         total_loss = 0
         total_tokens = 0
+        # counters for avg loss weight by number of tokens (excluding padding)
         
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.epoch}")
+        # tqdm progress bar for training batches
         
         for batch_idx, (src, tgt) in enumerate(pbar):
             src = src.to(self.device)
@@ -64,38 +68,45 @@ class Trainer:
             tgt_input = tgt[:, :-1]
             tgt_output = tgt[:, 1:]
             
-            self.optimizer.zero_grad()
+            self.optimizer.zero_grad()  # reset gradients
             
             # Mixed precision forward
             with autocast():
                 output = self.model(src, tgt_input)
-                # output: (batch, tgt_len-1, vocab_size)
+                # Forward pass: (batch, tgt_len-1, vocab_size)
                 # tgt_output: (batch, tgt_len-1)
                 loss = self.criterion(
                     output.reshape(-1, output.size(-1)),
+                    # .reshape(-1, 32000): flatten (batch*(tgt_len-1), vocab_size)
+
                     tgt_output.reshape(-1)
+                    # flatten (batch*(tgt_len-1))
                 )
             
             # Backward with scaling
             self.scaler.scale(loss).backward()
+            # .scale(loss): scales the loss for better precision in gradients
+            # .backward(): computes gradients (scaled)
             
             # Gradient clipping
-            self.scaler.unscale_(self.optimizer)
+            self.scaler.unscale_(self.optimizer)  # remove scaling for clipping
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            # clip gradients to prevent explosion (max norm of 1.0)
             
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
+            self.scaler.step(self.optimizer) # update parameters with scaled gradients
+            self.scaler.update()             # update the scale factor for next iteration (batch)
             
             if self.scheduler:
                 self.scheduler.step()
+                # update learning rate according to scheduler (usually per optimization step)
             
             # Stats (excluding padding)
-            non_pad_mask = (tgt_output != 0)
-            n_tokens = non_pad_mask.sum().item()
-            total_loss += loss.item() * n_tokens
-            total_tokens += n_tokens
+            non_pad_mask = (tgt_output != 0)      # mask to count only non-padding tokens
+            n_tokens = non_pad_mask.sum().item()  # number of non-padding tokens in the batch
+            total_loss += loss.item() * n_tokens  # accumulate total loss weighted by number of tokens
+            total_tokens += n_tokens              # accumulate total tokens for average loss calculation
             
-            self.global_step += 1
+            self.global_step += 1                 # increment global step for scheduler and logging
             
             # Logging
             if batch_idx % self.log_interval == 0:
@@ -107,53 +118,61 @@ class Trainer:
         
         epoch_loss = total_loss / max(total_tokens, 1)
         return epoch_loss
+    # avg loss for the epoch weighted by number of tokens (excluding padding)
     
     @torch.no_grad()
     def validate(self):
         if self.val_loader is None:
             return None
             
-        self.model.eval()
-        total_loss = 0
-        total_tokens = 0
+        self.model.eval()  # evaluation mode: disables dropout, batch norm uses running stats
+        total_loss = 0      
+        total_tokens = 0  
         
+        # tqdm progress bar for validation batches
         for src, tgt in tqdm(self.val_loader, desc="Validation"):
-            src = src.to(self.device)
+            src = src.to(self.device)  
             tgt = tgt.to(self.device)
             
-            tgt_input = tgt[:, :-1]
-            tgt_output = tgt[:, 1:]
+            tgt_input = tgt[:, :-1]  # all tokens except last (teacher forcing)
+            tgt_output = tgt[:, 1:]  # all tokens except first (target to predict)
             
+            # Mixed precision forward
             with autocast():
                 output = self.model(src, tgt_input)
                 loss = self.criterion(
                     output.reshape(-1, output.size(-1)),
-                    tgt_output.reshape(-1)
+                    tgt_output.reshape(-1)  
                 )
             
+            # Stats (excluding padding)
             non_pad_mask = (tgt_output != 0)
             n_tokens = non_pad_mask.sum().item()
             total_loss += loss.item() * n_tokens
             total_tokens += n_tokens
         
+        # average validation loss weighted by number of tokens (excluding padding)
         val_loss = total_loss / max(total_tokens, 1)
         return val_loss
     
+    # Checkpointing
     def save_checkpoint(self, filename=None, is_best=False):
         if filename is None:
             filename = f"checkpoint_epoch_{self.epoch}.pt"
         
+        # Save checkpoint with model state, optimizer state, scaler state, epoch, best val loss and global step
         path = os.path.join(self.save_dir, filename)
         
         checkpoint = {
             'epoch': self.epoch,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scaler_state_dict': self.scaler.state_dict(),
-            'best_val_loss': self.best_val_loss,
-            'global_step': self.global_step,
+            'model_state_dict': self.model.state_dict(),          # model parameters
+            'optimizer_state_dict': self.optimizer.state_dict(),  # optimizer parameters (including learning rate)
+            'scaler_state_dict': self.scaler.state_dict(),        # scaler parameters for mixed precision      
+            'best_val_loss': self.best_val_loss,                  # best validation loss for checkpointing
+            'global_step': self.global_step,                      # global step count for scheduler and logging
         }
         
+        # Save checkpoint to disk
         torch.save(checkpoint, path)
         print(f"Checkpoint saved: {path}")
         
@@ -162,7 +181,10 @@ class Trainer:
             torch.save(checkpoint, best_path)
             print(f"Best model saved!")
     
+    # Load checkpoint (for resuming training)
     def load_checkpoint(self, path):
+        # Load checkpoint from disk and restore model state, optimizer state, scaler state, epoch, 
+        # best val loss and global step
         checkpoint = torch.load(path, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
@@ -172,7 +194,19 @@ class Trainer:
         self.global_step = checkpoint['global_step']
         print(f"Loaded checkpoint from epoch {self.epoch}")
     
+    # Main training loop
     def fit(self, n_epochs, resume_from=None):
+        '''
+        Main training loop with optional resuming from checkpoint.
+        For each epoch:
+        - Train for one epoch and calculate training loss
+        - Validate and calculate validation loss (if val_loader is provided)
+        - Save checkpoint (and best model if validation loss improved)
+        - Print epoch summary with time, training loss and validation loss
+        NOTE: checkpoint epoch 0 saves as self.epoch = 0, so range (0, 10) will restart from epoch 0
+        FIX: use range(self.epoch + 1, n_epochs) to continue from the last epoch in case of resuming from checkpoint
+        '''
+        
         if resume_from:
             self.load_checkpoint(resume_from)
         
@@ -210,9 +244,16 @@ def get_scheduler(optimizer, d_model, warmup_steps=4000):
     """
     Learning rate scheduler for Transformer 
     lr = d_model^(-0.5) * min(step^(-0.5), step * warmup^(-1.5))
+    phase 1 (warmup): lr increases linearly with step (step * warmup^(-1.5))
+    phase 2 (decay): lr decreases with inverse square root of step (step^(-0.5))
+    This scheduler is designed to work well with the Adam optimizer and the Transformer architecture
     """
     def lr_lambda(step):
         step = max(1, step)
+        # warmup: step * (4000^(-1.5)) = grows linearly with step during warmup phase
+        # decay: step^(-0.5) = decreases with inverse square root of step after warmup phase
+
         return (d_model ** -0.5) * min(step ** -0.5, step * (warmup_steps ** -1.5))
     
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    # LambdaLR applies the lr_lambda function to compute the learning rate at each step based on the global step count
