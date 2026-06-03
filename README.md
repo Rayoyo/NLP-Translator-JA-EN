@@ -114,3 +114,8 @@ It is better not to direclty use Google Colab due to the RAM limit (8GB), so the
                 ├── jp_tokenizer.model
                 └── jp_tokenizer.vocab
         ```
+3. After, you can simply opend the file `FINALVERNAMENOTEBOOK` on Colab and run every cell in the notebook in order
+   - You must select T4 for the runtime to avoid run con cpu, instead, with this option you can run on GPU, but Colab free has LIMITS
+     > The train could take some time, but no worries! \
+     > Every epoch will be saved as `checkpoint` in the folder `model`, to resume from the LAST epoch and go on with the train
+   - You can see the code with the comments directly on GitHub, but you can open it on Colab too, to see every cell together with their description
