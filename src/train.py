@@ -21,7 +21,8 @@ class Trainer:
         scheduler=None,       # learning rate scheduler (optional)
         device='cuda',
         save_dir='models',    # directory to save checkpoints
-        log_interval=100      # print training stats every N batches
+        log_interval=100,     # print training stats every N batches
+        accumulator_steps=4  # number of steps to accumulate gradients for (default: 1 = no accumulation)
     ):
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -29,7 +30,7 @@ class Trainer:
         self.device = device
         self.save_dir = save_dir
         self.log_interval = log_interval
-        
+        self.accumulator_steps = accumulator_steps
         # default optimizer: Adam with transformer-friendly settings
         self.optimizer = optimizer or torch.optim.Adam(
             model.parameters(), 
@@ -58,6 +59,8 @@ class Trainer:
         
         pbar = tqdm(self.train_loader, desc=f"Epoch {self.epoch}")
         # tqdm progress bar for training batches
+
+        self.optimizer.zero_grad()  # reset gradients at the start of the epoch (or after accumulation steps)
         
         for batch_idx, (src, tgt) in enumerate(pbar):
             src = src.to(self.device)
@@ -68,7 +71,7 @@ class Trainer:
             tgt_input = tgt[:, :-1]
             tgt_output = tgt[:, 1:]
             
-            self.optimizer.zero_grad()  # reset gradients
+            # self.optimizer.zero_grad()  # reset gradients
             
             # Mixed precision forward
             with autocast():
@@ -88,33 +91,44 @@ class Trainer:
             # .scale(loss): scales the loss for better precision in gradients
             # .backward(): computes gradients (scaled)
             
-            # Gradient clipping
-            self.scaler.unscale_(self.optimizer)  # remove scaling for clipping
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-            # clip gradients to prevent explosion (max norm of 1.0)
-            
-            self.scaler.step(self.optimizer) # update parameters with scaled gradients
-            self.scaler.update()             # update the scale factor for next iteration (batch)
-            
-            if self.scheduler:
-                self.scheduler.step()
-                # update learning rate according to scheduler (usually per optimization step)
+            # weight update and gradient clipping every accumulation_steps
+            if (batch_idx + 1) % self.accumulation_steps == 0:
+                self.scaler.unscale_(self.optimizer)    # remove scaling for clipping
+                # clip gradients to prevent explosion (max norm of 1.0)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+
+                self.scaler.step(self.optimizer)    # update parameters with scaled gradients
+                self.scaler.update()                # update the scale factor for next iteration (batch)
+                self.optimizer.zero_grad()          # reset gradients after update
+                
+                if self.scheduler:
+                    # update learning rate according to scheduler (usually per optimization step)
+                    self.scheduler.step()
             
             # Stats (excluding padding)
-            non_pad_mask = (tgt_output != 0)      # mask to count only non-padding tokens
-            n_tokens = non_pad_mask.sum().item()  # number of non-padding tokens in the batch
-            total_loss += loss.item() * n_tokens  # accumulate total loss weighted by number of tokens
-            total_tokens += n_tokens              # accumulate total tokens for average loss calculation
+            non_pad_mask = (tgt_output != 0)                               # mask to count only non-padding tokens
+            n_tokens = non_pad_mask.sum().item()                           # number of non-padding tokens in the batch
+            total_loss += loss.item() * self.accumulation_steps * n_tokens # accumulate total loss weighted by number of tokens and accumulation steps
+            total_tokens += n_tokens                                       # accumulate total tokens for average loss calculation
             
-            self.global_step += 1                 # increment global step for scheduler and logging
+            self.global_step += 1                                          # increment global step for scheduler and logging
             
-            # Logging
+            # Logging every log_interval batches
             if batch_idx % self.log_interval == 0:
                 avg_loss = total_loss / max(total_tokens, 1)
                 pbar.set_postfix({
                     'loss': f'{avg_loss:.4f}',
-                    'lr': f'{self.optimizer.param_groups[0]["lr"]:.2e}'
+                    'lr': f'{self.optimizer.param_groups[0]["lr"]:.2e}',
+                    'step': f'{batch_idx}/{len(self.train_loader)}'
                 })
+
+            # Updates remaining weights if epoch doesn't end on a multiple of accumulation_steps
+            if (batch_idx + 1) % self.accumulation_steps != 0:
+                self.scaler.unscale_(self.optimizer)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.optimizer.zero_grad()
         
         epoch_loss = total_loss / max(total_tokens, 1)
         return epoch_loss
