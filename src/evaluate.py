@@ -1,5 +1,5 @@
 """
-BLEU evaluation and comparison with pre-trained model Helsinki-NLP/opus-mt-en-jap
+BLEU(bilingual evaluation understudy) evaluation and comparison with pre-trained model Helsinki-NLP/opus-mt-en-jap
 """
 
 import torch
