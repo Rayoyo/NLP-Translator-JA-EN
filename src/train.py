@@ -34,7 +34,7 @@ class Trainer:
         # default optimizer: Adam with transformer-friendly settings
         self.optimizer = optimizer or torch.optim.Adam(
             model.parameters(), 
-            lr=1e-4,             # initial learning rate (will be overridden by scheduler if provided)
+            lr=5e-4,             # initial learning rate (will be overridden by scheduler if provided)
             betas=(0.9, 0.98),   # momentum adam (0.9 for gradient, 0.98 for squared gradient)
             eps=1e-9             # epsilon for numerical stability
         )
@@ -254,7 +254,7 @@ class Trainer:
                 self.save_checkpoint(f"backup_epoch_{epoch}.pt")
 
 
-def get_scheduler(optimizer, d_model, warmup_steps=4000):
+def get_scheduler(optimizer, d_model, warmup_steps=1000):
     """
     Learning rate scheduler for Transformer 
     lr = d_model^(-0.5) * min(step^(-0.5), step * warmup^(-1.5))
@@ -264,7 +264,7 @@ def get_scheduler(optimizer, d_model, warmup_steps=4000):
     """
     def lr_lambda(step):
         step = max(1, step)
-        # warmup: step * (4000^(-1.5)) = grows linearly with step during warmup phase
+        # warmup: step * (1000^(-1.5)) = grows linearly with step during warmup phase
         # decay: step^(-0.5) = decreases with inverse square root of step after warmup phase
 
         return (d_model ** -0.5) * min(step ** -0.5, step * (warmup_steps ** -1.5))
