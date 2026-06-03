@@ -92,7 +92,7 @@ class Trainer:
             # .backward(): computes gradients (scaled)
             
             # weight update and gradient clipping every accumulation_steps
-            if (batch_idx + 1) % self.accumulation_steps == 0:
+            if (batch_idx + 1) % self.accumulator_steps == 0:
                 self.scaler.unscale_(self.optimizer)    # remove scaling for clipping
                 # clip gradients to prevent explosion (max norm of 1.0)
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
@@ -108,7 +108,7 @@ class Trainer:
             # Stats (excluding padding)
             non_pad_mask = (tgt_output != 0)                               # mask to count only non-padding tokens
             n_tokens = non_pad_mask.sum().item()                           # number of non-padding tokens in the batch
-            total_loss += loss.item() * self.accumulation_steps * n_tokens # accumulate total loss weighted by number of tokens and accumulation steps
+            total_loss += loss.item() * self.accumulator_steps * n_tokens # accumulate total loss weighted by number of tokens and accumulation steps
             total_tokens += n_tokens                                       # accumulate total tokens for average loss calculation
             
             self.global_step += 1                                          # increment global step for scheduler and logging
