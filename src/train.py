@@ -2,6 +2,8 @@
 Training loop with checkpointing, mixed precision and save on Drive
 """
 
+import math
+
 import torch
 import torch.nn as nn
 from torch.cuda.amp import autocast, GradScaler
@@ -34,7 +36,7 @@ class Trainer:
         # default optimizer: Adam with transformer-friendly settings
         self.optimizer = optimizer or torch.optim.Adam(
             model.parameters(), 
-            lr=5e-4,             # initial learning rate (will be overridden by scheduler if provided)
+            lr=1e-4,             # initial learning rate (will be overridden by scheduler if provided)
             betas=(0.9, 0.98),   # momentum adam (0.9 for gradient, 0.98 for squared gradient)
             eps=1e-9             # epsilon for numerical stability
         )
@@ -254,20 +256,25 @@ class Trainer:
                 self.save_checkpoint(f"backup_epoch_{epoch}.pt")
 
 
-def get_scheduler(optimizer, d_model, warmup_steps=1000):
+def get_scheduler(optimizer, d_model, warmup_steps=4000, total_steps=12500):
     """
-    Learning rate scheduler for Transformer 
+    Scheduler with linear warmup and cosine decay (inspired by "Attention is All You Need" paper)
     lr = d_model^(-0.5) * min(step^(-0.5), step * warmup^(-1.5))
-    phase 1 (warmup): lr increases linearly with step (step * warmup^(-1.5))
-    phase 2 (decay): lr decreases with inverse square root of step (step^(-0.5))
+    phase 1 (warmup): LR increases linearly from 0 to peak (d_model^(-0.5) * warmup_steps^(-0.5)) over warmup_steps
+    phase 2 (decay): LR decreases following a cosine curve from the peak to near zero over the remaining steps (total_steps - warmup_steps)
     This scheduler is designed to work well with the Adam optimizer and the Transformer architecture
     """
     def lr_lambda(step):
         step = max(1, step)
-        # warmup: step * (1000^(-1.5)) = grows linearly with step during warmup phase
-        # decay: step^(-0.5) = decreases with inverse square root of step after warmup phase
+        # linear warmup for the first warmup_steps, then cosine decay for the remaining steps
 
-        return (d_model ** -0.5) * min(step ** -0.5, step * (warmup_steps ** -1.5))
+        if step < warmup_steps:
+            # Warmup phase: LR grows linearly from 0 to peak
+            return step / warmup_steps
+        else:
+            # Decay phase: cosine annealing, not 1/sqrt(step) too aggressive for later steps
+            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            return 0.5 * (1 + math.cos(math.pi * progress))
     
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
     # LambdaLR applies the lr_lambda function to compute the learning rate at each step based on the global step count
