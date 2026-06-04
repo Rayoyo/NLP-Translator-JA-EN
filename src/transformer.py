@@ -95,10 +95,10 @@ class MultiHeadAttention(nn.Module):
         '''
         
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, -1e9)
+            scores = scores.masked_fill(mask == 0, -1e4)
             '''
             mask == 0 → positions to mask (False/0) 
-            masked_fill → sets those positions to a very large negative value (-1e9) 
+            masked_fill → sets those positions to a very large negative value (-1e4) 
             -1e4 in softmax → exp(-10000) ≈ 0, that position will be oscured
             '''
         
