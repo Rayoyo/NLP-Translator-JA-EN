@@ -6,7 +6,7 @@ It does NOT load everything in RAM, it reads on-the-fly using offset index
 """
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 from functools import partial
 
 
