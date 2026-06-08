@@ -92,7 +92,14 @@ class Trainer:
             self.scaler.scale(loss).backward()
             # .scale(loss): scales the loss for better precision in gradients
             # .backward(): computes gradients (scaled)
-            
+
+            # Stats: use loss.item() original (NOT scaled) for correct log
+            non_pad_mask = (tgt_output != 0)             # mask to count only non-padding tokens
+            n_tokens = non_pad_mask.sum().item()         # number of non-padding tokens in the batch
+            total_loss += loss.item() * n_tokens         # accumulate total loss weighted by number of tokens (excluding padding)
+            total_tokens += n_tokens                     # accumulate total tokens (excluding padding) for avg loss calculation
+        
+
             # weight update and gradient clipping every accumulation_steps
             if (batch_idx + 1) % self.accumulator_steps == 0:
                 self.scaler.unscale_(self.optimizer)    # remove scaling for clipping
@@ -106,16 +113,9 @@ class Trainer:
                 if self.scheduler:
                     # update learning rate according to scheduler (usually per optimization step)
                     self.scheduler.step()
-            
-            # Stats (excluding padding)
-            non_pad_mask = (tgt_output != 0)                               # mask to count only non-padding tokens
-            n_tokens = non_pad_mask.sum().item()                           # number of non-padding tokens in the batch
-            total_loss += loss.item() * self.accumulator_steps * n_tokens # accumulate total loss weighted by number of tokens and accumulation steps
-            total_tokens += n_tokens                                       # accumulate total tokens for average loss calculation
-            
-            self.global_step += 1                                          # increment global step for scheduler and logging
-            
-            # Logging every log_interval batches
+                self.global_step += 1          
+
+            # Logging
             if batch_idx % self.log_interval == 0:
                 avg_loss = total_loss / max(total_tokens, 1)
                 pbar.set_postfix({
@@ -124,13 +124,16 @@ class Trainer:
                     'step': f'{batch_idx}/{len(self.train_loader)}'
                 })
 
-            # Updates remaining weights if epoch doesn't end on a multiple of accumulation_steps
-            if (batch_idx + 1) % self.accumulator_steps != 0:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.optimizer.zero_grad()
+        # Manage remaning batchs
+        if (len(self.train_loader) % self.accumulator_steps) != 0:
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            self.optimizer.zero_grad()
+            if self.scheduler:
+                self.scheduler.step()
+            self.global_step += 1
         
         epoch_loss = total_loss / max(total_tokens, 1)
         return epoch_loss
@@ -255,8 +258,13 @@ class Trainer:
             if True:
                 self.save_checkpoint(f"backup_epoch_{epoch}.pt")
 
-
-def get_scheduler(optimizer, d_model, warmup_steps=4000, total_steps=12500):
+'''
+change total stes based on dataset size and batch size:
+for a dataset with 100k samples and batch size of 16, 
+one epoch is 100000 / 16 = 6250 steps. For 10 epochs, total steps = 6250 * 10 = 62500
+the warmup must be arround 5% to 10% of total steps, so 4000 steps is a good choice for warmup
+'''
+def get_scheduler(optimizer, d_model, warmup_steps=4000, total_steps=62500):
     """
     Scheduler with linear warmup and cosine decay (inspired by "Attention is All You Need" paper)
     lr = d_model^(-0.5) * min(step^(-0.5), step * warmup^(-1.5))
