@@ -6,11 +6,12 @@ import math
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 import os
 import time
 
+DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class Trainer:
     def __init__(
@@ -46,7 +47,7 @@ class Trainer:
         
         self.scheduler = scheduler
         
-        self.scaler = GradScaler()         # Mixed precision
+        self.scaler = GradScaler(DEVICE)   # Mixed precision
         self.global_step = 0               # counts total optimization steps (for scheduler)
         self.epoch = 0                     # current epoch
         self.best_val_loss = float('inf')  # best validation loss for checkpointing
@@ -76,7 +77,7 @@ class Trainer:
             # self.optimizer.zero_grad()  # reset gradients
             
             # Mixed precision forward
-            with autocast():
+            with autocast(DEVICE):
                 output = self.model(src, tgt_input)
                 # Forward pass: (batch, tgt_len-1, vocab_size)
                 # tgt_output: (batch, tgt_len-1)
@@ -157,7 +158,7 @@ class Trainer:
             tgt_output = tgt[:, 1:]  # all tokens except first (target to predict)
             
             # Mixed precision forward
-            with autocast():
+            with autocast(DEVICE):
                 output = self.model(src, tgt_input)
                 loss = self.criterion(
                     output.reshape(-1, output.size(-1)),
