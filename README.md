@@ -1,6 +1,8 @@
 # NLP-Translator-JA-EN
 My own very first translator, by using python and working on a jupiter notebook
 
+> NOTE: If you run the GUI on the notebook, do NOT SAVE the notebook with its out -> DELETE OUTPUT BEFORE SAVE THE NEW VERSION!
+
 Here I will add some info about how to see the project and start it on your computer
 
 ---
@@ -20,18 +22,16 @@ Here I will add some info about how to see the project and start it on your comp
 │   ├── en_tokenizer.vocab      # Token List → ID (readable text)
 │   ├── jp_tokenizer.model      # Japanese Vocabulary (SentencePiece Unigram)
 │   └── jp_tokenizer.vocab      # Token list -> ID
-├── notebooks/   -------------- # Jupyter Notebook----------------------------------
-│   └── main_training.ipynb     # Notebook Colab 
 ├── src/ ---------------------- # Modular Python code (the "core")------------------
 │   ├── __init__.py             # Makes src an importable Python package
 │   ├── transformer.py          # Transformer architecture (Encoder, Decoder, Attention)
 │   ├── dataset.py              # Dataset memory-efficient (LAZY loading)
 │   ├── train.py                # Training loop
-│   ├── evaluate.py             # BLEU score & comparison
-│   └── gui.py ________________ # Gradio interface _________________________________
+│   └──evaluate.py ___________ # BLEU score & comparison _________________________________
 ├── app.py                      # Entry point for local GUI
 ├── clean_dataset.py            # To clean the dataset and select a part of it (1 500 000 sentences)
 ├── local_tokenizer_train.py    # Wrapper for training/loading, cound be avoided if you use the ones provided by JParaCrawl
+├── nlp_translator_main_VER30.ipynb      # lastest actual version of jupyter notebook
 ├── requirements.txt            # List of required Python libraries
 ├── .gitignore                  # Not loaded files
 └── README.md                   # Project documentation
@@ -114,8 +114,10 @@ It is better not to direclty use Google Colab due to the RAM limit (8GB), so the
                 ├── jp_tokenizer.model
                 └── jp_tokenizer.vocab
         ```
-3. After, you can simply opend the file `FINALVERNAMENOTEBOOK` on Colab and run every cell in the notebook in order
+3. After, you can simply opend the file `nlp_translator_main_VER30.ipynb` on Colab and run every cell in the notebook in order
    - You must select T4 for the runtime to avoid run con cpu, instead, with this option you can run on GPU, but Colab free has LIMITS
      > The train could take some time, but no worries! \
      > Every epoch will be saved as `checkpoint` in the folder `model`, to resume from the LAST epoch and go on with the train
    - You can see the code with the comments directly on GitHub, but you can open it on Colab too, to see every cell together with their description
+4. On the notebook is present the GUI section in with you can actual try the transaltion with a pre trained model and the custom one!
+   > NOTE: make sure to DELETE every OUTPUT before save the notebook again! 
