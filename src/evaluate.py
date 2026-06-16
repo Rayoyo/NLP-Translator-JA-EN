@@ -9,15 +9,21 @@ from tqdm import tqdm
 import random
 
 
-def compute_bleu(references, hypotheses):
+
+def compute_bleu(references, hypotheses, direction="en-jp"):
     """
-    Calculate BLEU score with sacrebleu
-    references: list of strings (target sentences)
-    hypotheses: list of strings (predicted sentences)
+    Calculates BLEU scores using appropriate subword tokenization profiles
     """
-    # sacrebleu expects list of references per hypothesis
+    # SacreBLEU expects a list of reference lists
     refs = [[ref] for ref in references]
-    bleu = sacrebleu.corpus_bleu(hypotheses, list(zip(*refs)))
+    
+    if direction == "en-jp":
+        # Force the evaluator to use the MeCab Japanese internal tokenizer profile
+        bleu = sacrebleu.corpus_bleu(hypotheses, list(zip(*refs)), tokenize="ja-mecab")
+    else:
+        # Standard international evaluation tokenization profile for JP -> EN
+        bleu = sacrebleu.corpus_bleu(hypotheses, list(zip(*refs)), tokenize="13a")
+        
     return bleu.score
 
 
