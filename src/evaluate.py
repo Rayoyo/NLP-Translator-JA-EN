@@ -27,16 +27,16 @@ def compute_bleu(references, hypotheses, direction="en-jp"):
     return bleu.score
 
 
-def translate_with_my_model(model, sp_src, sp_tgt, sentences, device='cuda', max_len=50, bos_id=2, eos_id=3):
+def translate_with_custom_model(model, sp_src, sp_tgt, sentences, device='cuda', max_len=50, bos_id=2, eos_id=3):
     """
-    translate using my model
+    translate using custom model
     sentences: list of strings in source language
     """
     model.eval()
     translations = []
     
     with torch.no_grad():
-        for sent in tqdm(sentences, desc="My Model"):
+        for sent in tqdm(sentences, desc="Custom Model"):
             # Tokenize
             src_ids = sp_src.encode(sent, out_type=int, add_bos=True, add_eos=True)
             src_tensor = torch.tensor([src_ids], dtype=torch.long).to(device)
@@ -88,7 +88,7 @@ def translate_with_pretrained(sentences, model_name="Helsinki-NLP/opus-mt-en-jap
 
 
 def evaluate_models(
-    my_model,
+    custom_model,
     sp_en,
     sp_jp,
     test_en_sentences,
@@ -107,8 +107,8 @@ def evaluate_models(
     if direction == "en-jp":
         src_sents = test_en_sentences
         ref_sents = test_jp_sentences
-        my_translations = translate_with_my_model(
-            my_model, sp_en, sp_jp, src_sents, device=device
+        custom_translations = translate_with_custom_model(
+            custom_model, sp_en, sp_jp, src_sents, device=device
         )
         pretrained_translations = translate_with_pretrained(
             src_sents, direction="en-jp"
@@ -116,20 +116,20 @@ def evaluate_models(
     else:
         src_sents = test_jp_sentences
         ref_sents = test_en_sentences
-        my_translations = translate_with_my_model(
-            my_model, sp_jp, sp_en, src_sents, device=device
+        custom_translations = translate_with_custom_model(
+            custom_model, sp_jp, sp_en, src_sents, device=device
         )
         pretrained_translations = translate_with_pretrained(
             src_sents, direction="jp-en"
         )
     
     # Calcola BLEU
-    my_bleu = compute_bleu(ref_sents, my_translations)
+    custom_bleu = compute_bleu(ref_sents, custom_translations)
     pretrained_bleu = compute_bleu(ref_sents, pretrained_translations)
     
     print(f"\n{'='*60}")
     print(f"RESULTS:")
-    print(f"  My Model BLEU:      {my_bleu:.2f}")
+    print(f"  Custom Model BLEU:      {custom_bleu:.2f}")
     print(f"  Pretrained BLEU:    {pretrained_bleu:.2f}")
     print(f"{'='*60}")
     
@@ -137,9 +137,9 @@ def evaluate_models(
     results = {
         'source': src_sents,
         'reference': ref_sents,
-        'my_translation': my_translations,
+        'custom_translation': custom_translations,
         'pretrained_translation': pretrained_translations,
-        'my_bleu': my_bleu,
+        'custom_bleu': custom_bleu,
         'pretrained_bleu': pretrained_bleu
     }
     
